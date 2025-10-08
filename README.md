@@ -224,7 +224,7 @@ This project is open source and available under the [MIT License](LICENSE).
 **ENGINYRING**
 
 - GitHub: [@ENGINYRING](https://github.com/ENGINYRING)
-- [**ENGINYRING**: Hosting • VPS • Domains • CAD/BIM]("https://www.enginyring.com")
+- [**ENGINYRING**: Hosting • VPS • Domains • CAD/BIM](https://www.enginyring.com)
 
 ---
 
