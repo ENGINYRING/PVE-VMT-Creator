@@ -188,8 +188,8 @@ if [ $? -ne 0 ]; then
 fi
 
 # Import disk
-echo "Importing disk..."
-importOutput=$(qm importdisk $virtualMachineId "$imageName" $volumeName 2>&1)
+echo "Importing disk as qcow2 format..."
+importOutput=$(qm importdisk $virtualMachineId "$imageName" $volumeName --format qcow2 2>&1)
 echo "$importOutput"
 
 if [ $? -ne 0 ]; then
@@ -201,7 +201,7 @@ echo ""
 echo "Extracting disk reference..."
 
 # Extract the disk reference from import output
-# The output contains something like "unused0: successfully imported disk 'local:9002/vm-9002-disk-0.raw'"
+# The output contains something like "unused0: successfully imported disk 'local:9002/vm-9002-disk-0.qcow2'"
 diskReference=$(echo "$importOutput" | grep -oP "successfully imported disk '\K[^']+")
 
 if [ -z "$diskReference" ]; then
