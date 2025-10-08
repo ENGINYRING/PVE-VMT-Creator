@@ -137,14 +137,6 @@ if qm status $virtualMachineId &>/dev/null; then
     qm destroy $virtualMachineId
 fi
 
-# Customize the image
-echo "Customizing image (installing qemu-guest-agent)..."
-virt-customize -a "$imageName" --install qemu-guest-agent
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to install qemu-guest-agent"
-    exit 1
-fi
-
 echo "Enabling root password authentication in sshd_config..."
 # Use virt-customize to run a sed command that modifies sshd_config
 # This command finds the 'PermitRootLogin' line (potentially commented out) and sets it to 'yes'
