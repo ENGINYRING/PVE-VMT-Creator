@@ -197,16 +197,22 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+echo ""
+echo "Extracting disk reference..."
+
 # Extract the disk reference from import output
 # The output contains something like "unused0: successfully imported disk 'local:9002/vm-9002-disk-0.raw'"
 diskReference=$(echo "$importOutput" | grep -oP "successfully imported disk '\K[^']+")
 
 if [ -z "$diskReference" ]; then
     echo "Error: Could not determine disk reference from import output"
+    echo "Import output was:"
+    echo "$importOutput"
     exit 1
 fi
 
-echo "Disk imported successfully: $diskReference"
+echo "Disk reference found: $diskReference"
+echo ""
 
 # Configure VM hardware and attach disk
 echo "Configuring VM hardware..."
