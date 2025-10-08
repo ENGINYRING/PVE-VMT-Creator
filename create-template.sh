@@ -210,12 +210,17 @@ if [ "$storageType" = "dir" ] || [ "$storageType" = "nfs" ]; then
     # Directory storage - manually copy to preserve qcow2
     echo "Directory storage detected - will copy qcow2 directly..."
     
-    # Get storage path using pvesm
-    storagePath=$(pvesm path "$volumeName:iso/test.iso" 2>/dev/null | sed 's|/iso/test.iso$||')
+    # Get storage path from the config file directly
+    storagePath=$(grep -A 10 "^dir: $volumeName" /etc/pve/storage.cfg | grep "^\s*path" | head -1 | awk '{print $2}')
     
-    # If that fails, try to get it from the config
+    # Fallback: try alternative detection methods
     if [ -z "$storagePath" ] || [ ! -d "$storagePath" ]; then
-        storagePath=$(grep -A 10 "^dir: $volumeName" /etc/pve/storage.cfg | grep "^\s*path" | awk '{print $2}')
+        # Try getting from pvesm path and strip the subdirectories
+        testPath=$(pvesm path "$volumeName:iso/test.iso" 2>/dev/null)
+        if [ -n "$testPath" ]; then
+            # Remove /template/iso/test.iso or /iso/test.iso from the end
+            storagePath=$(echo "$testPath" | sed 's|/template/iso/test\.iso$||' | sed 's|/iso/test\.iso$||')
+        fi
     fi
     
     # Final fallback
@@ -257,6 +262,7 @@ if [ "$storageType" = "dir" ] || [ "$storageType" = "nfs" ]; then
     
     diskReference="$volumeName:$virtualMachineId/vm-$virtualMachineId-disk-0.qcow2"
     echo "Disk copied successfully: $diskReference"
+    echo "Physical location: $destImage"
     
     # Verify Proxmox can see the disk
     echo "Verifying disk visibility to Proxmox..."
