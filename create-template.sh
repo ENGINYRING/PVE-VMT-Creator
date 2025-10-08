@@ -58,8 +58,12 @@ echo "Proxmox VM Template Creator"
 echo "============================================"
 echo "Image URL: $imageURL"
 echo "Image Name: $imageName"
+echo "Volume: $volumeName"
 echo "VM ID: $virtualMachineId"
 echo "Template Name: $templateName"
+echo "CPU Cores: $tmp_cores"
+echo "Memory: $tmp_memory MB"
+echo "CPU Type: $cpuTypeRequired"
 echo "============================================"
 echo
 
@@ -185,11 +189,27 @@ fi
 
 # Import disk
 echo "Importing disk..."
-qm importdisk $virtualMachineId "$imageName" $volumeName
+importOutput=$(qm importdisk $virtualMachineId "$imageName" $volumeName 2>&1)
+echo "$importOutput"
+
 if [ $? -ne 0 ]; then
     echo "Error: Failed to import disk"
     exit 1
 fi
+
+# Extract the disk reference from import output
+# The output contains something like "unused0: successfully imported disk 'local:9002/vm-9002-disk-0.raw'"
+diskReference=$(echo "$importOutput" | grep -oP "successfully imported disk '\K[^']+")
+
+if [ -z "$diskReference" ]; then
+    echo "Error: Could not determine disk reference from import output"
+    exit 1
+fi
+
+echo "Disk imported successfully: $diskReference"
+
+# Configure VM hardware and attach disk
+echo "Configuring VM hardware..."
 
 # Set SCSI controller
 qm set $virtualMachineId --scsihw virtio-scsi-pci
@@ -198,9 +218,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Attach the imported disk to scsi0
+# Attach the imported disk to scsi0 using the correct disk reference
 echo "Attaching disk to SCSI0..."
-qm set $virtualMachineId --scsi0 $volumeName:vm-$virtualMachineId-disk-0
+qm set $virtualMachineId --scsi0 "$diskReference"
 if [ $? -ne 0 ]; then
     echo "Error: Failed to attach disk"
     exit 1
@@ -214,14 +234,37 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Configure VM
-echo "Configuring VM..."
-#qm set $virtualMachineId --scsihw virtio-scsi-pci --scsi0 $volumeName:vm-$virtualMachineId-disk-0
-#qm set $virtualMachineId --boot c --bootdisk scsi0
+# Add Cloud-Init drive
+echo "Adding Cloud-Init drive..."
 qm set $virtualMachineId --ide2 $volumeName:cloudinit
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to add Cloud-Init drive"
+    exit 1
+fi
+
+# Configure serial console
+echo "Configuring serial console..."
 qm set $virtualMachineId --serial0 socket --vga serial0
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to configure serial console"
+    exit 1
+fi
+
+# Configure network with DHCP
+echo "Configuring network..."
 qm set $virtualMachineId --ipconfig0 ip=dhcp
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to configure network"
+    exit 1
+fi
+
+# Set CPU type
+echo "Setting CPU type..."
 qm set $virtualMachineId --cpu cputype=$cpuTypeRequired
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to set CPU type"
+    exit 1
+fi
 
 # Convert to template
 echo "Converting VM to template..."
