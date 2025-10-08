@@ -188,30 +188,55 @@ if [ $? -ne 0 ]; then
 fi
 
 # Import disk
-echo "Importing disk as qcow2 format..."
-importOutput=$(qm importdisk $virtualMachineId "$imageName" $volumeName --format qcow2 2>&1)
-echo "$importOutput"
+echo "Importing disk in qcow2 format..."
 
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to import disk"
-    exit 1
-fi
-
-echo ""
-echo "Extracting disk reference..."
-
-# Extract the disk reference from import output
-# The output contains something like "unused0: successfully imported disk 'local:9002/vm-9002-disk-0.qcow2'"
-diskReference=$(echo "$importOutput" | grep -oP "successfully imported disk '\K[^']+")
-
-if [ -z "$diskReference" ]; then
-    echo "Error: Could not determine disk reference from import output"
-    echo "Import output was:"
+# Get storage path for directory-based storage
+if pvesm status | grep "^$volumeName" | grep -q "dir"; then
+    # Directory storage - manually copy to preserve qcow2
+    storagePath=$(pvesm path "$volumeName:0" 2>/dev/null | sed 's|/0$||' || echo "/var/lib/vz")
+    vmImageDir="$storagePath/images/$virtualMachineId"
+    
+    # Create VM image directory if it doesn't exist
+    mkdir -p "$vmImageDir"
+    
+    # Copy the qcow2 file
+    destImage="$vmImageDir/vm-$virtualMachineId-disk-0.qcow2"
+    echo "Copying qcow2 image to: $destImage"
+    cp "$imageName" "$destImage"
+    
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to copy disk image"
+        exit 1
+    fi
+    
+    diskReference="$volumeName:$virtualMachineId/vm-$virtualMachineId-disk-0.qcow2"
+    echo "Disk copied successfully: $diskReference"
+else
+    # LVM or other storage - use importdisk with format flag
+    importOutput=$(qm importdisk $virtualMachineId "$imageName" $volumeName --format qcow2 2>&1)
     echo "$importOutput"
-    exit 1
+    
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to import disk"
+        exit 1
+    fi
+    
+    echo ""
+    echo "Extracting disk reference..."
+    
+    # Extract the disk reference from import output
+    diskReference=$(echo "$importOutput" | grep -oP "successfully imported disk '\K[^']+")
+    
+    if [ -z "$diskReference" ]; then
+        echo "Error: Could not determine disk reference from import output"
+        echo "Import output was:"
+        echo "$importOutput"
+        exit 1
+    fi
+    
+    echo "Disk reference found: $diskReference"
 fi
 
-echo "Disk reference found: $diskReference"
 echo ""
 
 # Configure VM hardware and attach disk
