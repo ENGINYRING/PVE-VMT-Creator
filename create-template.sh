@@ -191,10 +191,33 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Set SCSI controller
+qm set $virtualMachineId --scsihw virtio-scsi-pci
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to set SCSI controller"
+    exit 1
+fi
+
+# Attach the imported disk to scsi0
+echo "Attaching disk to SCSI0..."
+qm set $virtualMachineId --scsi0 $volumeName:vm-$virtualMachineId-disk-0
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to attach disk"
+    exit 1
+fi
+
+# Set boot order and boot disk
+echo "Configuring boot settings..."
+qm set $virtualMachineId --boot order=scsi0
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to set boot order"
+    exit 1
+fi
+
 # Configure VM
 echo "Configuring VM..."
-qm set $virtualMachineId --scsihw virtio-scsi-pci --scsi0 $volumeName:vm-$virtualMachineId-disk-0
-qm set $virtualMachineId --boot c --bootdisk scsi0
+#qm set $virtualMachineId --scsihw virtio-scsi-pci --scsi0 $volumeName:vm-$virtualMachineId-disk-0
+#qm set $virtualMachineId --boot c --bootdisk scsi0
 qm set $virtualMachineId --ide2 $volumeName:cloudinit
 qm set $virtualMachineId --serial0 socket --vga serial0
 qm set $virtualMachineId --ipconfig0 ip=dhcp
