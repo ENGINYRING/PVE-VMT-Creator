@@ -190,21 +190,38 @@ fi
 # Import disk
 echo "Importing disk in qcow2 format..."
 
-# Check if this is directory-based storage
-storageType=$(pvesm status -storage "$volumeName" 2>/dev/null | tail -n1 | awk '{print $2}')
-echo "Storage type detected: $storageType"
+# Get storage information
+echo "Checking storage configuration..."
+storageInfo=$(pvesm status -storage "$volumeName" 2>&1)
+
+if [ $? -ne 0 ]; then
+    echo "Error: Storage '$volumeName' not found"
+    echo "$storageInfo"
+    exit 1
+fi
+
+echo "$storageInfo"
+
+# Get storage type and path
+storageType=$(echo "$storageInfo" | tail -n1 | awk '{print $2}')
+echo "Storage type: $storageType"
 
 if [ "$storageType" = "dir" ] || [ "$storageType" = "nfs" ]; then
     # Directory storage - manually copy to preserve qcow2
-    echo "Using directory storage - copying qcow2 directly..."
+    echo "Directory storage detected - will copy qcow2 directly..."
     
-    # Get the actual storage path from pvesm
-    storagePath=$(pvesm status -storage "$volumeName" | tail -n1 | awk '{print $8}')
+    # Get storage path using pvesm
+    storagePath=$(pvesm path "$volumeName:iso/test.iso" 2>/dev/null | sed 's|/iso/test.iso$||')
     
+    # If that fails, try to get it from the config
     if [ -z "$storagePath" ] || [ ! -d "$storagePath" ]; then
-        echo "Error: Could not determine storage path for $volumeName"
-        echo "Attempting default path..."
+        storagePath=$(grep -A 10 "^dir: $volumeName" /etc/pve/storage.cfg | grep "^\s*path" | awk '{print $2}')
+    fi
+    
+    # Final fallback
+    if [ -z "$storagePath" ] || [ ! -d "$storagePath" ]; then
         storagePath="/var/lib/vz"
+        echo "Warning: Using default path: $storagePath"
     fi
     
     vmImageDir="$storagePath/images/$virtualMachineId"
@@ -212,8 +229,12 @@ if [ "$storageType" = "dir" ] || [ "$storageType" = "nfs" ]; then
     echo "Storage path: $storagePath"
     echo "VM image directory: $vmImageDir"
     
-    # Create VM image directory if it doesn't exist
+    # Create VM image directory
     mkdir -p "$vmImageDir"
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to create directory $vmImageDir"
+        exit 1
+    fi
     
     # Copy the qcow2 file
     destImage="$vmImageDir/vm-$virtualMachineId-disk-0.qcow2"
@@ -225,14 +246,27 @@ if [ "$storageType" = "dir" ] || [ "$storageType" = "nfs" ]; then
         exit 1
     fi
     
+    # Verify the file was created
+    if [ ! -f "$destImage" ]; then
+        echo "Error: Disk image was not created at $destImage"
+        exit 1
+    fi
+    
     # Set proper permissions
     chmod 644 "$destImage"
     
     diskReference="$volumeName:$virtualMachineId/vm-$virtualMachineId-disk-0.qcow2"
     echo "Disk copied successfully: $diskReference"
+    
+    # Verify Proxmox can see the disk
+    echo "Verifying disk visibility to Proxmox..."
+    if ! pvesm list "$volumeName" | grep -q "vm-$virtualMachineId-disk-0.qcow2"; then
+        echo "Warning: Disk may not be immediately visible to Proxmox"
+        sleep 2
+    fi
 else
-    # LVM or other storage - use importdisk with format flag
-    echo "Using block storage - importing with qm importdisk..."
+    # LVM or other storage - use importdisk
+    echo "Block storage detected - using qm importdisk..."
     importOutput=$(qm importdisk $virtualMachineId "$imageName" $volumeName --format qcow2 2>&1)
     echo "$importOutput"
     
