@@ -29,11 +29,8 @@
 ## 🔧 Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/ENGINYRING/PVE-VMT-Creator.git
-
-# Navigate to the directory
-cd PVE-VMT-Creator
+# Download the script
+wget -O create-template.sh https://raw.githubusercontent.com/ENGINYRING/PVE-VMT-Creator/refs/heads/main/create-template.sh
 
 # Make the script executable
 chmod +x create-template.sh
