@@ -226,3 +226,9 @@ This project is open source and available under the [MIT License](LICENSE).
 ---
 
 ⭐ If you find this project helpful, please give it a star!
+
+* * * 
+© 2025 ENGINYRING. All rights reserved.  
+* * *
+
+[Web hosting](https://www.enginyring.com/en/webhosting) | [VPS hosting](https://www.enginyring.com/en/virtual-servers) | [Free DevOps tools](https://www.enginyring.com/tools)
